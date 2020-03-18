@@ -1,0 +1,73 @@
+##  R Excercise
+### Consider the following data on home-well contamination in 3020 households in Ara- hazar upazila, Bangladesh. The response variable is switch (binary variable whether or not the household switched to another well from an unsafe well). Other variables collected for each household were arsenic (the level of arsenic contamination in the household’s original well, in hundreds of micrograms per liter), dist100 (distance in 100-meter units to the closest known safe well), educ (years of education of the head of the household) and assoc (whether or not any members of the household participated in any community organizations: no or yes). The data is available in MyCourses under Datasets. Load the data and compute dist100 as follows.
+```{r}
+wells <- read.table("wells.dat") 
+attach(wells)
+dist100 <- dist/100
+```
+### (a) Fit a logistic regression model with the intercept and dist100. Interpret the model. Test the adequacy of this model using the Pearson $X^2$ and the likelihood ratio $G^2$ statistics. Conclude at the 5% level.
+```{r}
+y<-as.factor(wells$switch)
+logitmod<-glm(y~dist100,family=binomial(link="logit"))
+summary(logitmod)
+```
+
+  
+Since g(x)=$\frac{1}{1-x}$, so we can get that $log\frac{\pi}{1-\pi}=0.61-0.62*dist100$. The paramter of dist100 is -0.62 which implies that as dist100 increase, the estimiated response will also increase, it is much more possible to switch the well.
+For the Pearson Residual:
+```{r}
+ncat <- 10
+
+bins <- cut(dist100,quantile(dist100,prob=c(0:ncat)/ncat),include.lowest=T)
+lswi <- split(switch,bins)
+counts <- lapply(lswi,FUN=function(x){as.numeric(x > 0)})
+beta <- coefficients(logitmod)
+
+observed <- lapply(counts,FUN=function(x){c(sum(x),length(x)-sum(x))})
+observed <- matrix(as.numeric(unlist(observed)),ncol=2,byrow=TRUE)
+
+#fitted number of success and failure
+fitted <- lapply(split(dist100,bins),FUN=function(x){pi <- exp(beta[1]+x*beta[2])/(1+exp(beta[1]+x*beta[2])); c(sum(pi),sum(1-pi)) } )
+fitted <- matrix(as.numeric(unlist(fitted)),ncol=2,byrow=TRUE)
+cbind(observed,fitted)
+
+
+X.2  <- sum(((observed-fitted)^2)/fitted)
+
+observed[10,2] <- 0.5  # just to avoid a log of zero in the likelihood ratio statistics
+
+G.2 <- 2*sum(observed*log(observed/fitted))
+
+pchisq(X.2, df=8,lower.tail=FALSE)
+```
+  
+For the $G^2$:
+```{r}
+pchisq(G.2, df=8,lower.tail=FALSE)
+```
+  
+with a confidence interval 
+
+```{r}
+#library(arm)
+# se.coef extract the standard error
+#se <- se.coef(logitmod)
+#c(exp(beta[2]-1.96*se[2]),exp(beta[2]+1.96*se[2]))
+```
+  
+According to the p value of dist100 and intercept, they are all less than 5%. We can conclude that the parameter has siginificant level of 5%, we reject the null hypothesis.  
+  
+### (b) Find the most appropriate logistic regression model for the data. Use the deviance, but also consider practical significance by looking at the AIC and the size of the effect of the predictors. Interpret the final model.
+
+Firstly, try all the predictor:
+```{r}
+lm<-glm(y~(dist100+educ+assoc+arsenic),family=binomial(link="logit"))
+summary(lm)
+lm0<-glm(y~(dist100+educ+arsenic),family=binomial(link="logit"))
+anova(lm,lm0,test='Chisq')
+```
+
+```{r}
+lm1<-glm(y~(dist100+educ+arsenic)^2,family=binomial(link="logit"))
+summary(lm1)
+```
