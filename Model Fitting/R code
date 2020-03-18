@@ -1,0 +1,83 @@
+## R excercise.Load the data set SoreThroat.dat available on MyCourses under Assigmnents:
+```{r}
+SoreThroat<-read.table("SoreThroat.dat",header=TRUE)
+attach(SoreThroat)
+```
+## In this data set, the response variable Y describes whether a patient having surgery experienced a sore throat on waking (1 = "yes", 0 = "no"). The explanatory variables are D, a continuous variable giving the duration of the surgery in minutes, and T, a factor variable with levels 1 = "Tracheal tube", 0 = "Laryngeal mask airway" indicating the type of device used to secure the airway.  
+## (a) Fit a GLM to the data, using the intercept, D, T, and the interaction between D and T. Write down the model for the probability of experiencing a sore throat on waking and interpret it (qualitative statements are fully sufficient).
+
+```{r}
+# probability of experiencing a sore throat
+# use the Gaussian GLM
+Y<-SoreThroat$Y
+D<-SoreThroat$D
+T0<- factor(SoreThroat$T)
+logitmod<- glm(cbind(Y,1-Y)~D+T0+T0*D,family=binomial,x=TRUE)
+summary(logitmod)
+```
+  
+We are using the binomial GLM with canonical link here, so $g(\mu_i)=log(\frac{p_i}{1-p_i})=\eta_i$.
+The probability of experiencing a sore throat P will be $log(\frac{p}{1-p}) = 0.366973+0.09062D-3.19094T$ and $P=\frac{p}{1-p}$. The P is approximatly the probability of Y=1. If the probability is higher than 0.5, then it is more likely to have a sore throat and otherwise it is more likely to have no sore throat.
+  
+## (b)If $\widehat{\beta}$ denotes that parameter pertaining to the interaction, construct a 95% confidence interval for $\widehat{\beta}$
+```{r}
+# construct the 95% CI
+I<-t(logitmod$x)%*%diag(logitmod$weights)%*%(logitmod$x)
+I.inv<-solve(I)
+
+sd<-sqrt(diag(I.inv))
+# here we want 95% CI 
+z<-qnorm(0.975)
+beta<-logitmod$coefficients
+
+c.upper<-beta+z*sd
+c.lower<-beta-z*sd
+CI<- cbind(c.lower,c.upper)
+colnames(CI)<-c("2.5%","97.5%")
+CI
+```
+  
+Then the 95% confidence interval for each paraeters is shown above, the 95% confidence interval for $\widehat{\beta}$ is [-0.0386,0.1878].
+
+## (c)Using (i) a Wald test and (ii) a likelihood ratio test, test whether the interaction between D and T is significant. Test at the 5% level.  
+For (i) wald test, we build a new model by adding a connection between D and T. Then if 
+```{r}
+library(Matrix)
+#test whether each beta=0 using Wald tests
+beta/sd
+pchisq((beta/sd)^2,df=1,lower.tail=FALSE)
+```
+  
+Then we can see that the p-value is 0.1966>0.05, so the null hypothsis is sitting in the 95% convidence interval.Then the null hypothesis should not be rejected, so the interaction between D and T is not significant.  
+```{r}
+# use the likelihood ratio test
+logit_new1<-glm(cbind(Y,1-Y)~D+T0,family=binomial,x=TRUE)
+L1<--2*(logLik(logit_new1)-logLik(logitmod))
+L1
+p.val<-pchisq(L1,df=1,lower.tail=FALSE)
+p.val
+```
+  
+The p value is equal to 0.1777>0.05, we should accpet the hull hypothsis that the interation is not significant.
+  
+## (d)Using (i) a Wald test and (ii) a likelihood ratio test, test whether the interaction between D and T and T are significant predictors (that is, whether we can remove T from the model altogether). Test at the 5% level.
+
+```{r}
+#Wald test
+var<-solve(I.inv[3:4,3:4])
+beta<-logitmod$coefficients
+beta2<-c(beta[3:4])
+W<-t(beta2)%*%var%*%(beta2)
+pchisq(W,df=2,lower.tail=FALSE)
+```
+```{r}
+#likelihood ratio test
+logit_new2<-glm(cbind(Y,1-Y)~D,family=binomial,x=TRUE)
+L2<--2*(logLik(logit_new2)-logLik(logitmod))
+L2
+p.val<-pchisq(L2,df=2,lower.tail=FALSE)
+p.val
+
+```
+  
+According to the Wald test, we have 0.129>0.05 and the likelihood ratio test shows that 0.0696>0.05. We accept the null hypothesis test that the interaction of D and T and T are not significant, so T can beremoved from the model.
